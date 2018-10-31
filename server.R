@@ -28,6 +28,7 @@ library(viridis)
 library(datasets)
 library(Hmisc)
 library(DT)
+library(gridExtra)
 
 function(input, output, session) {
   output$res <- renderText({
@@ -41,7 +42,7 @@ function(input, output, session) {
     sidebarMenu(
       id = "tabs",
       menuItem("Overview", tabName = "overview", icon = icon("info")),
-      menuItem("Prices", tabName = "price", icon = icon("dollar")),
+      menuItem("Data", tabName = "data", icon = icon("dollar")),
       menuItem("Rated Games", tabName = "rating", icon = icon("cloud")),
       menuItem("Genres", tabName = "genres", icon = icon("align-justify")),
       menuItem("Future Development", tabName = "future", icon = icon("cog"))
@@ -72,13 +73,14 @@ function(input, output, session) {
                              dplyr::mutate(date = as.Date(date)) %>% 
                              dplyr::mutate(metascore = as.numeric(metascore)) %>% 
                              dplyr::mutate(genres = as.character(genres)) %>% 
-                             dplyr::arrange(., metascore, price))
+                             dplyr::arrange(., metascore, price) %>% 
+                             dplyr::select(., app_name, developer, date, genres, price, metascore))
   
   output$games_price <- renderPlot({
     game_score %>% 
       ggplot(aes(x = date, y = price, color = metascore)) + 
       geom_point() +
-      theme_classic() + 
+      theme_fivethirtyeight() + 
       scale_color_gradient() +
       xlab("Date") + ylab("Price") +
       theme(legend.position= 'None') +
@@ -90,7 +92,7 @@ function(input, output, session) {
     game_score %>% 
       ggplot(aes(x = date, y = metascore, color = price)) + 
       geom_point() +
-      theme_classic() + 
+      theme_fivethirtyeight() + 
       scale_color_gradient() +
       xlab("Date") + ylab("Metascore") +
       theme(legend.position= 'None') +
@@ -102,7 +104,7 @@ function(input, output, session) {
     game_score %>%
       ggplot(aes(x = price, y = metascore, color = metascore)) +
       geom_point() +
-      theme_classic() + 
+      theme_fivethirtyeight() + 
       scale_color_gradient() +
       xlab("Price USD") + ylab("Metascore") +
       theme(legend.position= 'None') +
@@ -110,16 +112,44 @@ function(input, output, session) {
       ggtitle("Metascore and Prices of Games")
   })
   
-  output$games_list <- renderDataTable({
-    DT::datatable(game_score, options = list(pageLength = 15))
+  game_score2 <- reactive({
+    game_score[,]})
+  
+  output$games_graphing <- renderPlot({
+    p <- ggplot(game_score2(), aes(x = input$x, y = input$y)) + 
+      geom_point() + 
+      theme_fivethirtyeight() + 
+      scale_color_gradient() +
+      geom_smooth(method = 'lm', color = "red")
+    
+    if (input$color != 'None')
+      p <- p + aes(color = input$color)
+    
+    print(p)
   })
   
-  #### Price
+  #### Basic Data
   
-  output$price_density <- renderPlot({
+  output$games_list <- renderDataTable({
+    DT::datatable(game_score, options = list(pageLength = 10))
+  })
+  
+  output$plot_price <- renderPlot({
     game_score %>% 
-      ggplot(aes(x = price, color = metascore)) +
-      geom_density()
+      ggplot(aes(x = price, fill = metascore)) +
+      geom_line(stat="bin") +
+      theme_fivethirtyeight() +
+      scale_fill_brewer(name = '', palette = 'Paired') +
+      ylab("Price USD")
+  })
+  
+  output$plot_meta <- renderPlot({
+    game_score %>% 
+      ggplot(aes(x = metascore, fill = metascore)) +
+      geom_line(stat="bin") +
+      theme_fivethirtyeight() +
+      scale_fill_brewer(name = '', palette = 'Paired') +
+      ylab("Metascore")
   })
   
   #### Genres
@@ -152,161 +182,125 @@ function(input, output, session) {
       geom_smooth(method = 'lm', se = FALSE, color = "red")
   })
   
+  output$table_tag <- renderDataTable({
+    steam_tag <- data.frame(game_score %>% 
+                              dplyr::filter(., grepl(input$tags, genres)))
+    DT::datatable(steam_tag, options = list(pageLength = 5))
+  })
+  
   #### Overall
-  
-  steam_action <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('Action', genres)))
-  
-  steam_adventure <- data.frame(game_score %>%
-                                  dplyr::filter(., grepl('Adventure', genres)))
-  
-  steam_casual <- data.frame(game_score %>%
-                                  dplyr::filter(., grepl('Casual', genres)))
-  
-  steam_indie <- data.frame(game_score %>%
-                                  dplyr::filter(., grepl('Indie', genres)))
-  
-  steam_mmo <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('MMO', genres)))
-  
-  steam_racing <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('Racing', genres)))
-  
-  steam_rpg <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('RPG', genres)))
-  
-  steam_simulation <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('Simulation', genres)))
-  
-  steam_sports <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('Sports', genres)))
-  
-  steam_strategy <- data.frame(game_score %>%
-                               dplyr::filter(., grepl('Strategy', genres)))
-  
-  output$plot_action <- renderPlot({
-    steam_action %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_adventure <- renderPlot({
-    steam_adventure %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_casual <- renderPlot({
-    steam_casual %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_indie <- renderPlot({
-    steam_indie %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_mmo <- renderPlot({
-    steam_mmo %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_racing <- renderPlot({
-    steam_racing %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_rpg <- renderPlot({
-    steam_rpg %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_simulation <- renderPlot({
-    steam_simulation %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_sports <- renderPlot({
-    steam_sports %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
-  
-  output$plot_strategy <- renderPlot({
-    steam_strategy %>%
-      ggplot(aes(x = price, y = metascore, color = price)) + 
-      geom_boxplot(alpha=.75,size=.25) +
-      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
-      theme_fivethirtyeight() + 
-      scale_color_gradientn(colours = viridis::plasma(10)) +
-      theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
-  })
     
   output$genre_all <- renderPlot({
-    p = grid.arrange(plot_action, plot_adventure, plot_casual, plot_indie, plot_mmo, plot_racing, plot_rpg, plot_simulation, plot_sports, plot_strategy, ncol=5)
-    print(p)
+    steam_action <- data.frame(game_score %>%
+                                 dplyr::filter(., grepl('Action', genres)))
+    steam_adventure <- data.frame(game_score %>%
+                                    dplyr::filter(., grepl('Adventure', genres)))
+    steam_casual <- data.frame(game_score %>%
+                                 dplyr::filter(., grepl('Casual', genres)))
+    steam_indie <- data.frame(game_score %>%
+                                dplyr::filter(., grepl('Indie', genres)))
+    steam_mmo <- data.frame(game_score %>%
+                              dplyr::filter(., grepl('Massively Multiplayer', genres)))
+    steam_racing <- data.frame(game_score %>%
+                                 dplyr::filter(., grepl('Racing', genres)))
+    steam_rpg <- data.frame(game_score %>%
+                              dplyr::filter(., grepl('RPG', genres)))
+    steam_simulation <- data.frame(game_score %>%
+                                     dplyr::filter(., grepl('Simulation', genres)))
+    steam_sports <- data.frame(game_score %>%
+                                 dplyr::filter(., grepl('Sports', genres)))
+    steam_strategy <- data.frame(game_score %>%
+                                   dplyr::filter(., grepl('Strategy', genres)))
+    p1 <- steam_action %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Action') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p2 <- steam_adventure %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p3 <- steam_casual %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Casual') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p4 <- steam_indie %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Indie') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p5 <- steam_mmo %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='MMO') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p6 <- steam_racing %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Racing') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p7 <- steam_rpg %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='RPG') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p8 <- steam_simulation %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Simulation') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p9 <- steam_sports %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Sports') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    p10 <- steam_strategy %>%
+      ggplot(aes(x = price, y = metascore, color = price)) + 
+      geom_boxplot(alpha=.75,size=.25) +
+      geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+      theme_fivethirtyeight() + 
+      scale_color_gradientn(colours = viridis::plasma(10)) +
+      theme(legend.position= 'None') +
+      xlab("Price USD") + ylab("Metascore") + labs(title='Strategy') +
+      geom_smooth(method = 'lm', se = FALSE, color = "red")
+    grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, ncol=5)
   })
-  
 }
