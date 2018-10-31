@@ -45,6 +45,7 @@ function(input, output, session) {
       menuItem("Data", tabName = "data", icon = icon("dollar")),
       menuItem("Rated Games", tabName = "rating", icon = icon("cloud")),
       menuItem("Genres", tabName = "genres", icon = icon("align-justify")),
+      menuItem("Recommendations", tabName = "recommender", icon = icon("font-awesome")),
       menuItem("Future Development", tabName = "future", icon = icon("cog"))
     )
   })
@@ -52,6 +53,8 @@ function(input, output, session) {
   #### Rated Games
   
   load("steam4.rdata")
+  
+  genre <- c('Action','Adventure','Casual','Indie','MMO','Racing','RPG','Simulation','Sports','Strategy')
   
   full_games <- data.frame(steam4 %>%
                              dplyr::filter(., early_access == "False") %>% 
@@ -85,7 +88,8 @@ function(input, output, session) {
       xlab("Date") + ylab("Price") +
       theme(legend.position= 'None') +
       geom_smooth(method = 'lm', color = "red") +
-      ggtitle("Current Game Prices by Release Date")
+      ggtitle("Current Game Prices by Release Date") +
+      xlab("Date") + ylab("Price (USD)")
   })
   
   output$games_meta <- renderPlot({
@@ -97,7 +101,8 @@ function(input, output, session) {
       xlab("Date") + ylab("Metascore") +
       theme(legend.position= 'None') +
       geom_smooth(method = 'lm', color = "red") +
-      ggtitle("Current Game Metascores by Release Date")
+      ggtitle("Current Game Metascores by Release Date") +
+      xlab("Date") + ylab("Metascores")
   })
   
   output$games_pricescore <- renderPlot({
@@ -109,23 +114,8 @@ function(input, output, session) {
       xlab("Price USD") + ylab("Metascore") +
       theme(legend.position= 'None') +
       geom_smooth(method = 'lm', color = "red") +
-      ggtitle("Metascore and Prices of Games")
-  })
-  
-  game_score2 <- reactive({
-    game_score[,]})
-  
-  output$games_graphing <- renderPlot({
-    p <- ggplot(game_score2(), aes(x = input$x, y = input$y)) + 
-      geom_point() + 
-      theme_fivethirtyeight() + 
-      scale_color_gradient() +
-      geom_smooth(method = 'lm', color = "red")
-    
-    if (input$color != 'None')
-      p <- p + aes(color = input$color)
-    
-    print(p)
+      ggtitle("Metascore and Prices of Games") +
+      xlab("Price (USD)") + ylab("Metascores")
   })
   
   #### Basic Data
@@ -139,8 +129,7 @@ function(input, output, session) {
       ggplot(aes(x = price, fill = metascore)) +
       geom_line(stat="bin") +
       theme_fivethirtyeight() +
-      scale_fill_brewer(name = '', palette = 'Paired') +
-      ylab("Price USD")
+      scale_fill_brewer(name = '', palette = 'Paired')
   })
   
   output$plot_meta <- renderPlot({
@@ -148,8 +137,7 @@ function(input, output, session) {
       ggplot(aes(x = metascore, fill = metascore)) +
       geom_line(stat="bin") +
       theme_fivethirtyeight() +
-      scale_fill_brewer(name = '', palette = 'Paired') +
-      ylab("Metascore")
+      scale_fill_brewer(name = '', palette = 'Paired')
   })
   
   #### Genres
@@ -178,13 +166,58 @@ function(input, output, session) {
       theme_fivethirtyeight() + 
       scale_color_gradientn(colours = viridis::plasma(10)) +
       theme(legend.position= 'None') +
-      xlab("Price USD") + ylab("Metascore") +
-      geom_smooth(method = 'lm', se = FALSE, color = "red")
+      geom_smooth(method = 'lm', se = FALSE, color = "red") +
+      xlab("Price USD") + ylab("Metascore")
+  })
+  
+  #### Game Recommendations
+  
+  selectInput <- reactive ({
+    switch(input$reco1,
+           "Action" = 'Action',
+           "Adventure" = 'Adventure',
+           "Casual" = 'Casual',
+           "Indie" = 'Indie',
+           "MMO" = 'MMO',
+           "Racing" = 'Racing',
+           "RPG" = 'RPG',
+           "Simulation" = 'Simulation',
+           "Sports" = 'Sports',
+           "Strategy" = 'Strategy')
+  })
+  
+  selectInput <- reactive({
+    switch(input$reco2,
+           "Action" = 'Action',
+           "Adventure" = 'Adventure',
+           "Casual" = 'Casual',
+           "Indie" = 'Indie',
+           "MMO" = 'MMO',
+           "Racing" = 'Racing',
+           "RPG" = 'RPG',
+           "Simulation" = 'Simulation',
+           "Sports" = 'Sports',
+           "Strategy" = 'Strategy')
   })
   
   output$table_tag <- renderDataTable({
     steam_tag <- data.frame(game_score %>% 
-                              dplyr::filter(., grepl(input$tags, genres)))
+                              dplyr::filter(., grepl(input$reco1, genres)) %>%
+                              dplyr::filter(., price < input$cost ) %>% 
+                              dplyr::arrange(., -metascore))
+    
+    if (input$reco1 == 'All' & input$reco2 == 'None')
+      steam_tag <- data.frame(game_score %>% 
+                                dplyr::filter(., price < input$cost ) %>% 
+                                dplyr::arrange(., -metascore))
+    
+    if (input$reco2 != 'None')
+      steam_tag <- data.frame(game_score %>% 
+                                dplyr::filter(., grepl(input$reco1, genres)) %>% 
+                                dplyr::filter(., grepl(input$reco2, genres)) %>%
+                                dplyr::filter(., price < input$cost ) %>% 
+                                dplyr::arrange(., -metascore))
+    
     DT::datatable(steam_tag, options = list(pageLength = 5))
   })
   
