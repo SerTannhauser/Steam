@@ -57,8 +57,10 @@ dashboardPage(
                                    img(src="http://img.photobucket.com/albums/v669/5CN/metascore_zpskqczindt.png?t=1540860145"),
                                    br(),
                                    br(),
-                                   p(paste("Metascore is a weighed average of critic reviews, assigning more importance (or weight) to some critics and publications based on their quality and stature."))
-                          ))),
+                                   p(paste("Metascore is a weighed average of critic reviews, assigning more importance (or weight) to some critics and publications based on their quality and stature."))),
+                          tabPanel("Challenges",
+                                   img(src="http://img.photobucket.com/albums/v669/5CN/age%20checker_zpsqhfeea7f.png?t=1540859351", width = "70%"))
+                          )),
       tabItem(tabName = "data", titlePanel("Data"),
               tabsetPanel(type = "tabs",
                           tabPanel("Background",
@@ -71,22 +73,22 @@ dashboardPage(
                                        tags$li("Cleaned for N/A or missing data for price and metascore, leaving behind Free to Play games."),
                                        tags$li("Changed prices for steam games that pulled bundle or sale prices rather than regular price."))),
                                    fluidRow()),
-                          tabPanel("Challenges",
-                                   img(src="http://img.photobucket.com/albums/v669/5CN/age%20checker_zpsqhfeea7f.png?t=1540859351", width = "70%")),
                           tabPanel("Price Density",
                                    plotOutput(outputId = "plot_price"),
                                    br(),
                                    tags$ul(
                                      tags$li("Average Price: $14.51"),
                                      tags$li("High: $59.99"),
-                                     tags$li("Low: Free"))),
+                                     tags$li("Low: Free"),
+                                     tags$li("Mode: $9.99 (540 games)"))),
                           tabPanel("Metascore",
                                    plotOutput(outputId = "plot_meta"),
                                    br(),
                                    tags$ul(
                                      tags$li("Average Metascore: 71.84"),
                                      tags$li("High: 96"),
-                                     tags$li("Low: 20")))
+                                     tags$li("Low: 20"),
+                                     tags$li("Mode: 80 (108 games)")))
                                    )),
       tabItem(tabName = "rating", titlePanel("Rated Games"),
               tabsetPanel(type = "tabs",
@@ -120,7 +122,7 @@ dashboardPage(
               fluidRow(
                 DT::dataTableOutput("table_tag"))),
       tabItem(tabName = "future", titlePanel("Future Developments"),
-              img(src="http://img.photobucket.com/albums/v669/5CN/the%20Future_zps4tihqi5m.png"),
+              img(src="http://img.photobucket.com/albums/v669/5CN/27c10c9c06e86be64c5bfb939487ed2abf8dbf79c18c21391803134802b8bf1c_zpsqfephvr1.jpg?t=1540934418"),
               br(),
               p(tags$ul(
                 tags$li("Fix code to scrape Steam games behind age wall."),
@@ -131,7 +133,8 @@ dashboardPage(
                         tags$ul(
                           tags$li("Determine short- and long-term trends in player reviews."),
                           tags$li("Compare with critic reviews."))),
-                tags$li("Analyze Early Access games."))))
+                tags$li("Analyze Early Access games."),
+                tags$li("Make plots interactive."))))
       )
     )
   )

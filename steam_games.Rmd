@@ -1,0 +1,463 @@
+---
+title: "Steam Games"
+author: "YiYang Cao"
+date: "October 29, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r output}
+
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(tidyverse)
+library(lubridate)
+library(imputeTS)
+library(gtools)
+library(RColorBrewer)
+library(ggthemes)
+library(reshape2)
+library(viridis)
+library(datasets)
+library(Hmisc)
+
+output %>%
+  select(., app_name, date, early_access, genres, price, metascore, id) %>%
+  mutate_all(~gsub('[^ -~]', '', .)) -> steam1
+
+steam1 %>%
+  separate(., date, c('developer', 'publisher'), sep = "Publisher:") -> steam2
+
+steam2 %>%
+  mutate(., date = parse_date_time(steam2$publisher, "%b %d, %y")) -> steam3
+
+steam3 %>%
+  filter(., app_name != "") %>%
+  separate(., developer, c('la', 'developer'), sep = "Developer:") -> steam4
+
+steam4$price <- sapply(steam4$price, tolower)
+
+steam4 %>% 
+  filter(!grepl('demo', steam4$price)) -> steam4
+
+steam4 %>%
+  filter(!grepl(' Demo', steam4$app_name)) -> steam4
+
+steam4 <- steam4[!is.na(steam4$date), ]
+
+save(steam4, file = "./steam4.rdata")
+
+steam4 %>%
+  filter(., early_access == "True") %>% 
+  dplyr::select(., app_name, developer, date, genres, price, metascore) ->  early_access
+
+early_access %>% 
+  mutate(., price = ifelse(grepl('try before you buy', price), '6.99', price)) %>% 
+  mutate(., price = ifelse(grepl('try the complete game for one hour for free:', price), '19.99', price)) %>%
+  mutate(., price = ifelse(grepl('free', price), '0.00', price)) %>% 
+  mutate(., price = ifelse(grepl('free to play', price), '0.00', price)) %>% 
+  mutate(., price = ifelse(grepl('', price), '0.00', price)) %>% 
+  mutate(price = as.numeric(as.character(price))) %>% 
+  mutate(date = as.Date(date)) %>% 
+  mutate(metascore = as.numeric(metascore)) %>% 
+  mutate(genres = as.character(genres)) -> early_access2
+
+early_access2 %>%
+  filter(., metascore != "NA") -> early_score
+
+early_score %>% 
+  mutate(price = as.numeric(as.character(price))) %>% 
+  arrange(., price) -> early_score2
+
+early_access2 %>% 
+  filter(., price != "NA") -> early_access3
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+steam4 %>%
+  filter(., early_access == "False") %>% 
+  dplyr::select(., app_name, developer, date, genres, price, metascore, id) -> full_games
+
+full_games %>% 
+  filter(., metascore != "NA") %>% 
+  filter(., id != "NA") %>% 
+  filter(., price != "") %>% 
+  filter(., developer != "Fabraz") %>% 
+  mutate(., price = ifelse(grepl('free', price), '0.00', price)) %>% 
+  mutate(., price = ifelse(grepl('free to play', price), '0.00', price)) %>% 
+  mutate(., price = ifelse(grepl('170.65', price), '19.99', price)) %>% 
+  mutate(., price = ifelse(grepl('239.72', price), '23.97', price)) %>% 
+  mutate(., price = ifelse(grepl('129.99', price), '4.99', price)) %>% 
+  mutate(., price = ifelse(grepl('102.93', price), '0.00', price)) %>% 
+  mutate(., price = ifelse(grepl('89.99', price), '29.99', price)) %>% 
+  mutate(price = as.numeric(as.character(price))) %>% 
+  mutate(date = as.Date(date)) %>% 
+  mutate(metascore = as.numeric(metascore)) %>% 
+  mutate(genres = as.character(genres)) %>% 
+  arrange(., metascore, price) -> game_score
+
+games_price <- game_score %>% 
+  ggplot(aes(x = date, y = price, color = metascore)) + 
+  geom_point() +
+  theme_classic() + 
+  scale_color_gradient() +
+  xlab("Date") + ylab("Price") +
+  theme(legend.position= 'None') +
+  geom_smooth(method = 'lm', color = "red") +
+  ggtitle("Current Game Prices by Release Date")
+games_price
+
+games_meta <- game_score %>% 
+  ggplot(aes(x = date, y = metascore, color = price)) + 
+  geom_point() +
+  theme_classic() + 
+  scale_color_gradient() +
+  xlab("Date") + ylab("Metascore") +
+  theme(legend.position= 'None') +
+  geom_smooth(method = 'lm', color = "red") +
+  ggtitle("Current Game Metascores by Release Date")
+games_meta
+
+games_pricescore <- game_score %>%
+  ggplot(aes(x = price, y = metascore, color = metascore)) +
+  geom_point() +
+  theme_classic() + 
+  scale_color_gradient() +
+  xlab("Price USD") + ylab("Metascore") +
+  theme(legend.position= 'None') +
+  geom_smooth(method = 'lm', color = "red") +
+  ggtitle("Metascore and Prices of Games")
+games_pricescore
+
+cor(game_score$price, game_score$metascore)
+
+describe(game_score)
+summary(game_score)
+
+```
+
+
+```{r pressure, echo=FALSE}
+
+# metascore 80 and greater
+game_score %>% 
+  filter(., metascore > 79) %>% 
+  arrange(., metascore, price, date) -> steam_80
+
+steam_metascore <- steam_80 %>% 
+  ggplot(aes(x = date, y = metascore, color = price)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', color = "red") +
+  theme_classic() + 
+  scale_color_gradient() +
+  theme(legend.position= 'None') +
+  xlab("Date") + ylab("Metascore") 
+steam_metascore
+
+steam_price <- steam_80 %>% 
+  ggplot(aes(x = date, y = price, color = metascore)) + 
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  theme_classic() + 
+  scale_color_gradient() +
+  theme(legend.position= 'None') +
+  xlab("Date") + ylab("Price USD") 
+steam_price
+
+# metascore versus genres
+
+genre_meta <- game_score %>%
+  ggplot(aes(x = genres, y = metascore, color = price)) +
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.25), size = 1, alpha = .5) +
+  theme_classic() +
+  scale_fill_brewer(name = '', palette = 'Paired') + 
+  theme(legend.position= 'None') +
+  xlab("Genres") + ylab("Metascore")
+genre_meta
+
+describe(steam_80)
+
+cor(steam_80$price, steam_80$metascore)
+
+```
+
+
+```{r pressure, echo=FALSE}
+
+# metascore action games
+game_score %>% 
+  filter(., grepl('Action', genres)) -> steam_action
+
+plot_action <- steam_action %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Action') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_action
+
+describe(steam_action)
+
+cor(steam_action$price, steam_action$metascore)
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore adventure games
+game_score %>%
+  filter(., grepl('Adventure', genres)) -> steam_adventure
+
+plot_adventure <- steam_adventure %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Adventure') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_adventure
+
+describe(steam_adventure)
+
+cor(steam_adventure$price, steam_adventure$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore RPG
+game_score %>% 
+  filter(., grepl('RPG', genres)) -> steam_rpg
+
+plot_rpg <- steam_rpg %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='RPG') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_rpg
+
+describe(steam_rpg)
+cor(steam_rpg$price, steam_rpg$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore strategy
+game_score %>%
+  filter(., grepl('Strategy', genres)) -> steam_strategy
+
+plot_strategy <- steam_strategy %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Strategy') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_strategy
+
+describe(steam_strategy)
+cor(steam_strategy$price, steam_strategy$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore sports
+game_score %>%
+  filter(., grepl('Sports', genres)) -> steam_sports
+
+plot_sports <- steam_sports %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Sports') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_sports
+
+describe(steam_sports)
+cor(steam_sports$price, steam_sports$metascore)
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore indie
+game_score %>%
+  filter(., grepl('Indie', genres)) -> steam_indie
+
+plot_indie <- steam_indie %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Indie') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_indie
+
+describe(steam_indie)
+cor(steam_indie$price, steam_indie$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore simulation
+game_score %>% 
+  filter(., grepl('Simulation', genres)) -> steam_simulation
+
+plot_simulation <- steam_simulation %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Simulation') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_simulation
+
+describe(steam_simulation)
+cor(steam_simulation$price, steam_simulation$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore casual
+game_score %>%
+  filter(., grepl('Casual', genres)) -> steam_casual
+
+plot_casual <- steam_casual %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Casual') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_casual
+
+describe(steam_casual)
+cor(steam_casual$price, steam_casual$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore racing
+game_score %>%
+  filter(., grepl('Racing', genres)) -> steam_racing
+
+plot_racing <- steam_racing %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='Racing') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_racing
+
+describe(steam_racing)
+cor(steam_racing$price, steam_racing$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+# metascore mmo
+game_score %>%
+  filter(., grepl('Massively Multiplayer', genres)) -> steam_mmo
+
+plot_mmo <- steam_mmo %>% 
+  ggplot(aes(x = price, y = metascore, color = price)) + 
+  geom_boxplot(alpha=.75,size=.25) +
+  geom_jitter(shape = 16, position = position_jitter(0.5), size = 2, alpha = .5) +
+  theme_fivethirtyeight() + 
+  scale_color_gradientn(colours = viridis::plasma(10)) +
+  theme(legend.position= 'None') +
+  xlab("Price USD") + ylab("Metascore") + labs(title='MMO') +
+  geom_smooth(method = 'lm', se = FALSE, color = "red")
+plot_mmo
+
+describe(steam_mmo)
+cor(steam_mmo$price, steam_mmo$metascore)
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+grid.arrange(plot_action, plot_adventure, plot_casual, plot_indie, plot_mmo, plot_racing, plot_rpg, plot_simulation, plot_sports, plot_strategy, ncol=5)
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+x <- 
+
+game_score
+  
+
+```
+

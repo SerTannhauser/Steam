@@ -23,12 +23,12 @@ library(imputeTS)
 library(gtools)
 library(RColorBrewer)
 library(ggthemes)
-library(reshape2)
 library(viridis)
 library(datasets)
 library(Hmisc)
 library(DT)
 library(gridExtra)
+library(plotly)
 
 function(input, output, session) {
   output$res <- renderText({
@@ -126,18 +126,16 @@ function(input, output, session) {
   
   output$plot_price <- renderPlot({
     game_score %>% 
-      ggplot(aes(x = price, fill = metascore)) +
-      geom_line(stat="bin") +
-      theme_fivethirtyeight() +
-      scale_fill_brewer(name = '', palette = 'Paired')
+      ggplot(aes(x = price)) +
+      geom_line(stat="bin", binwidth = 1) +
+      theme_fivethirtyeight()
   })
   
   output$plot_meta <- renderPlot({
     game_score %>% 
-      ggplot(aes(x = metascore, fill = metascore)) +
-      geom_line(stat="bin") +
-      theme_fivethirtyeight() +
-      scale_fill_brewer(name = '', palette = 'Paired')
+      ggplot(aes(x = metascore)) +
+      geom_line(stat="bin", binwidth = 1) +
+      theme_fivethirtyeight()
   })
   
   #### Genres
@@ -148,7 +146,7 @@ function(input, output, session) {
            "Adventure" = 'Adventure',
            "Casual" = 'Casual',
            "Indie" = 'Indie',
-           "MMO" = 'MMO',
+           "MMO" = 'Massively Multiplayer',
            "Racing" = 'Racing',
            "RPG" = 'RPG',
            "Simulation" = 'Simulation',
@@ -178,7 +176,7 @@ function(input, output, session) {
            "Adventure" = 'Adventure',
            "Casual" = 'Casual',
            "Indie" = 'Indie',
-           "MMO" = 'MMO',
+           "MMO" = 'Massively Multiplayer',
            "Racing" = 'Racing',
            "RPG" = 'RPG',
            "Simulation" = 'Simulation',
@@ -192,7 +190,7 @@ function(input, output, session) {
            "Adventure" = 'Adventure',
            "Casual" = 'Casual',
            "Indie" = 'Indie',
-           "MMO" = 'MMO',
+           "MMO" = 'Massively Multiplayer',
            "Racing" = 'Racing',
            "RPG" = 'RPG',
            "Simulation" = 'Simulation',
